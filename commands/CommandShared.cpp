@@ -9,8 +9,12 @@
 #include "ObjectAccessor.h"
 // pi-lens-ignore: clang:pp_file_not_found
 #include "ObjectMgr.h"
+// pi-lens-ignore: clang:pp_file_not_found
+#include "WorldSession.h"
 
+#include <mutex>
 #include <string>
+#include <unordered_map>
 
 // pi-lens-ignore: clang:pp_file_not_found
 #include "playerbot/PlayerbotAIConfig.h"
@@ -70,6 +74,63 @@ std::string ProtocolSafe(std::string value)
             character = ' ';
     }
     return value;
+}
+
+std::string LocalizedAreaName(ChatHandler* handler, uint32_t areaId, std::string name)
+{
+    if (areaId && handler && handler->GetSession())
+        sObjectMgr.GetAreaLocaleString(areaId, handler->GetSession()->GetSessionDbLocaleIndex(), &name);
+    return name;
+}
+
+// The loot log stores only the English source name (bot_events.csv), so the
+// translation goes through a name -> entry index built once from the templates.
+// Same-named entries keep the first one that has a translation.
+std::string LocalizedLootSourceName(int locIdx, std::string const& sourceType, std::string const& name)
+{
+    if (locIdx < 0 || name.empty())
+        return name;
+    static std::once_flag built;
+    static std::unordered_map<std::string, uint32> creatures;
+    static std::unordered_map<std::string, uint32> objects;
+    std::call_once(built, []()
+    {
+        for (auto const& entry : sObjectMgr.GetCreatureInfoMap())
+        {
+            CreatureLocale const* loc = entry.second ? sObjectMgr.GetCreatureLocale(entry.first) : nullptr;
+            bool translated = false;
+            if (loc)
+                for (std::string const& n : loc->Name)
+                    translated = translated || !n.empty();
+            if (translated)
+                creatures.emplace(entry.second->name, entry.first);
+        }
+        for (auto const& entry : sObjectMgr.GetGameObjectInfoMap())
+        {
+            GameObjectLocale const* loc = sObjectMgr.GetGameObjectLocale(entry.first);
+            bool translated = false;
+            if (loc)
+                for (std::string const& n : loc->Name)
+                    translated = translated || !n.empty();
+            if (translated)
+                objects.emplace(entry.second.name, entry.first);
+        }
+    });
+    if (sourceType == "corpse")
+    {
+        auto it = creatures.find(name);
+        if (it != creatures.end())
+            if (CreatureLocale const* loc = sObjectMgr.GetCreatureLocale(it->second))
+                if (loc->Name.size() > size_t(locIdx) && !loc->Name[locIdx].empty())
+                    return loc->Name[locIdx];
+        return name;
+    }
+    auto it = objects.find(name);
+    if (it != objects.end())
+        if (GameObjectLocale const* loc = sObjectMgr.GetGameObjectLocale(it->second))
+            if (loc->Name.size() > size_t(locIdx) && !loc->Name[locIdx].empty())
+                return loc->Name[locIdx];
+    return name;
 }
 
 void SendActionError(ChatHandler* handler, std::string const& intent,

@@ -17,6 +17,7 @@
 #include "../runtime/BotManager.h"
 #include "../ai/playerbot/playerbot.h"
 #include "../ai/playerbot/ChatHelper.h"
+#include "../ai/playerbot/PlayerbotTextMgr.h"
 #include "ModuleLog.h"
 #include "ScriptObjects.h"
 #include "GossipDef.h"
@@ -120,6 +121,36 @@ char const* RaceName(uint8 race)
     }
 }
 
+// [shiken] fixed menu text -> the player's language via ai_playerbot_texts (name = English text, text_loc<N>).
+int32 LocIdx(Player* player)
+{
+    return player && player->GetSession() ? player->GetSession()->GetSessionDbLocaleIndex() : -1;
+}
+
+std::string T(Player* player, char const* english)
+{
+    return sPlayerbotTextMgr.GetTextForLocale(english, LocIdx(player));
+}
+
+// class / race names: the client DBC strings of the player's locale (ChrClasses / ChrRaces)
+std::string ClassNameFor(Player* player, uint8 classId)
+{
+    LocaleConstant loc = player && player->GetSession() ? player->GetSession()->GetSessionDbcLocale() : LOCALE_enUS;
+    if (ChrClassesEntry const* e = sChrClassesStore.LookupEntry(classId))
+        if (e->name[loc] && *e->name[loc])
+            return e->name[loc];
+    return ClassName(classId);
+}
+
+std::string RaceNameFor(Player* player, uint8 race)
+{
+    LocaleConstant loc = player && player->GetSession() ? player->GetSession()->GetSessionDbcLocale() : LOCALE_enUS;
+    if (ChrRacesEntry const* e = sChrRacesStore.LookupEntry(race))
+        if (e->name[loc] && *e->name[loc])
+            return e->name[loc];
+    return RaceName(race);
+}
+
 // The spec step lists talent-flavoured choices but hires by role: the option
 // maps to a BOT_ROLE bit consumed by provisioning (premade build + forced
 // role). The option's pathName selects the premade tree, so the wizard is
@@ -162,6 +193,11 @@ bool KnownHireClass(uint8 classId)
 void AddItem(Player* player, uint8 icon, char const* text, uint32 sender, uint32 action)
 {
     player->PlayerTalkClass->GetGossipMenu().AddMenuItem(icon, text, sender, action, "", false);
+}
+
+void AddItem(Player* player, uint8 icon, std::string const& text, uint32 sender, uint32 action)
+{
+    AddItem(player, icon, text.c_str(), sender, action);
 }
 
 // Each recruiter has its own greeting (npc_text = its entry, world migration
@@ -218,7 +254,7 @@ std::string HireFeeLabel(Player* player, uint32_t cost)
 {
     if (player && TortoiseBots::HireFeeWaived(static_cast<int>(player->GetSession()->GetSecurity()),
         sPlayerbotAIConfig.hireFreeMinSecurity))
-        return "free (GM)";
+        return T(player, "free (GM)");
     return ai::ChatHelper::formatMoney(cost);
 }
 
@@ -232,6 +268,28 @@ void ShowTierMenu(Player* player, Creature* creature, uint8 classId, uint8 race,
 void ShowConfirmMenu(Player* player, Creature* creature, uint8 classId, uint8 race, uint8 gender,
     uint8 specIndex, uint8 gearTier);
 
+// [shiken] HireProvisionService builds its answer in English; translate the fixed ones and the success line.
+std::string LocalizeHireMessage(Player* player, HireOutcome const& outcome)
+{
+    std::string const& m = outcome.message;
+    std::string prefix = "Hired " + outcome.botName + " for ";
+    if (!outcome.botName.empty() && m.compare(0, prefix.size(), prefix) == 0)
+    {
+        std::string const tail = ". Your companion is mustering.";
+        size_t end = m.find(tail, prefix.size());
+        if (end != std::string::npos)
+        {
+            std::map<std::string, std::string> ph;
+            ph["%name"] = outcome.botName;
+            std::string fee = m.substr(prefix.size(), end - prefix.size());
+            ph["%fee"] = fee == "free (GM)" ? T(player, "free (GM)") : fee;
+            return sPlayerbotTextMgr.GetTextForLocale("Hired %name for %fee. Your companion is mustering.", LocIdx(player), ph)
+                + m.substr(end + tail.size());
+        }
+    }
+    return T(player, m.c_str());
+}
+
 void ShowClassMenu(Player* player, Creature* creature)
 {
     Team team = HireOfferTeam(player, creature);
@@ -239,7 +297,7 @@ void ShowClassMenu(Player* player, Creature* creature)
     {
         if (!ClassForFaction(classId, team))
             continue;
-        AddItem(player, GOSSIP_ICON_CHAT, ClassName(classId), kSenderClass, classId);
+        AddItem(player, GOSSIP_ICON_CHAT, ClassNameFor(player, classId), kSenderClass, classId);
     }
     player->PlayerTalkClass->SendGossipMenu(GossipText(player, creature), creature->GetObjectGuid());
 }
@@ -253,19 +311,19 @@ void ShowRaceMenu(Player* player, Creature* creature, uint8 classId)
             continue;
         if (team != TEAM_NONE && Player::TeamForRace(race) != team)
             continue;
-        AddItem(player, GOSSIP_ICON_CHAT, RaceName(race), kSenderRace, (uint32(classId) << 8) | race);
+        AddItem(player, GOSSIP_ICON_CHAT, RaceNameFor(player, race), kSenderRace, (uint32(classId) << 8) | race);
         ++shown;
     }
-    AddItem(player, GOSSIP_ICON_TALK, "< Back", kSenderRace, (uint32(classId) << 8) | kBackAction);
+    AddItem(player, GOSSIP_ICON_TALK, T(player, "< Back"), kSenderRace, (uint32(classId) << 8) | kBackAction);
     player->PlayerTalkClass->SendGossipMenu(GossipText(player, creature), creature->GetObjectGuid());
 }
 
 void ShowGenderMenu(Player* player, Creature* creature, uint8 classId, uint8 race)
 {
     uint32 packed = (uint32(classId) << 8) | race;
-    AddItem(player, GOSSIP_ICON_CHAT, "Male", kSenderGender, (packed << 8) | GENDER_MALE);
-    AddItem(player, GOSSIP_ICON_CHAT, "Female", kSenderGender, (packed << 8) | GENDER_FEMALE);
-    AddItem(player, GOSSIP_ICON_TALK, "< Back", kSenderGender, (packed << 8) | kBackAction);
+    AddItem(player, GOSSIP_ICON_CHAT, T(player, "Male"), kSenderGender, (packed << 8) | GENDER_MALE);
+    AddItem(player, GOSSIP_ICON_CHAT, T(player, "Female"), kSenderGender, (packed << 8) | GENDER_FEMALE);
+    AddItem(player, GOSSIP_ICON_TALK, T(player, "< Back"), kSenderGender, (packed << 8) | kBackAction);
     player->PlayerTalkClass->SendGossipMenu(GossipText(player, creature), creature->GetObjectGuid());
 }
 
@@ -278,10 +336,10 @@ void ShowSpecMenu(Player* player, Creature* creature, uint8 classId, uint8 race,
     {
         if (!HireSpecOffered(classId, static_cast<int>(i), hireLevel, sPlayerbotAIConfig.shamanTankEnabled))
             continue;
-        AddItem(player, GOSSIP_ICON_BATTLE, specs[i].label, kSenderSpec,
+        AddItem(player, GOSSIP_ICON_BATTLE, T(player, specs[i].label), kSenderSpec,
             (uint32(classId) << 24) | (uint32(race) << 16) | (uint32(gender) << 8) | i);
     }
-    AddItem(player, GOSSIP_ICON_TALK, "< Back", kSenderSpec,
+    AddItem(player, GOSSIP_ICON_TALK, T(player, "< Back"), kSenderSpec,
         (uint32(classId) << 24) | (uint32(race) << 16) | (uint32(gender) << 8) | kBackAction);
     player->PlayerTalkClass->SendGossipMenu(GossipText(player, creature), creature->GetObjectGuid());
 }
@@ -307,11 +365,11 @@ void ShowRootMenu(Player* player, Creature* creature)
         ShowClassMenu(player, creature);
         return;
     }
-    AddItem(player, GOSSIP_ICON_CHAT, "Hire bots", kWorldBuffSenderRoot, kWorldBuffRootHire);
+    AddItem(player, GOSSIP_ICON_CHAT, T(player, "Hire bots"), kWorldBuffSenderRoot, kWorldBuffRootHire);
     if (buffsVisible)
-        AddItem(player, GOSSIP_ICON_MONEY_BAG, "World buffs", kWorldBuffSenderRoot, kWorldBuffRootBuffs);
+        AddItem(player, GOSSIP_ICON_MONEY_BAG, T(player, "World buffs"), kWorldBuffSenderRoot, kWorldBuffRootBuffs);
     if (contractsVisible)
-        AddItem(player, GOSSIP_ICON_BATTLE, "Mercenary contracts", kContractsSenderRoot, 1);
+        AddItem(player, GOSSIP_ICON_BATTLE, T(player, "Mercenary contracts"), kContractsSenderRoot, 1);
     player->PlayerTalkClass->SendGossipMenu(GossipText(player, creature), creature->GetObjectGuid());
 }
 
@@ -372,7 +430,7 @@ void ShowWorldBuffMenu(Player* player, Creature* creature)
         else
             AddItem(player, GOSSIP_ICON_MONEY_BAG, label.str().c_str(), kWorldBuffSenderBuy, purchase);
     }
-    AddItem(player, GOSSIP_ICON_TALK, "< Back", kWorldBuffSenderBack, kWorldBuffSenderBack);
+    AddItem(player, GOSSIP_ICON_TALK, T(player, "< Back"), kWorldBuffSenderBack, kWorldBuffSenderBack);
     // Issue #490 PR 2: the tier quests share these NPCs now. The buff page
     // keeps only the world-buff range (90000-90013); contracts own 90100+.
     FilterQuestMenu(player, creature, kWorldBuffQuestRallyA, kWorldBuffQuestSilithystH);
@@ -455,7 +513,7 @@ void ShowContractsCounterMenu(Player* player, Creature* creature, uint32_t credi
             AddItem(player, GOSSIP_ICON_DOT, boss->name, kContractsSenderBack, kContractsSenderBack);
             ++shown;
         }
-        AddItem(player, GOSSIP_ICON_TALK, "< Back", kContractsSenderBack, kContractsSenderBack);
+        AddItem(player, GOSSIP_ICON_TALK, T(player, "< Back"), kContractsSenderBack, kContractsSenderBack);
         player->PlayerTalkClass->SendGossipMenu(GossipText(player, creature), creature->GetObjectGuid());
         return;
     }
@@ -490,7 +548,7 @@ void ShowContractsMenu(Player* player, Creature* creature)
     // This branch's quest list only: tier quests 90100-90106. The buff page
     // keeps 90000-90013 the same way (FilterQuestMenu above).
     FilterQuestMenu(player, creature, kHireUnlockQuestFirst, kHireUnlockQuestLast);
-    AddItem(player, GOSSIP_ICON_TALK, "< Back", kContractsSenderBack, kContractsSenderBack);
+    AddItem(player, GOSSIP_ICON_TALK, T(player, "< Back"), kContractsSenderBack, kContractsSenderBack);
     player->PlayerTalkClass->SendGossipMenu(GossipText(player, creature), creature->GetObjectGuid());
 }
 
@@ -528,7 +586,7 @@ void ShowBuyConfirm(Player* player, Creature* creature, uint32_t buyAction)
         label << " on you";
     label << ". Confirm?";
     AddItem(player, GOSSIP_ICON_MONEY_BAG, label.str().c_str(), kWorldBuffSenderConfirm, EncodeConfirmAction(buyAction, people));
-    AddItem(player, GOSSIP_ICON_TALK, "< Back", kWorldBuffSenderBack, kWorldBuffSenderSayge);
+    AddItem(player, GOSSIP_ICON_TALK, T(player, "< Back"), kWorldBuffSenderBack, kWorldBuffSenderSayge);
     player->PlayerTalkClass->SendGossipMenu(GossipText(player, creature), creature->GetObjectGuid());
 }
 
@@ -538,7 +596,7 @@ void ShowSaygeMenu(Player* player, Creature* creature)
     WorldBuffSaygePick const* picks = WorldBuffSaygePicks(count);
     for (uint32_t i = 0; i < count; ++i)
         AddItem(player, GOSSIP_ICON_MONEY_BAG, picks[i].label, kWorldBuffSenderBuy, EncodeSaygeAction(kWorldBuffBuySayge, i + 1));
-    AddItem(player, GOSSIP_ICON_TALK, "< Back", kWorldBuffSenderBack, kWorldBuffSenderSayge);
+    AddItem(player, GOSSIP_ICON_TALK, T(player, "< Back"), kWorldBuffSenderBack, kWorldBuffSenderSayge);
     player->PlayerTalkClass->SendGossipMenu(GossipText(player, creature), creature->GetObjectGuid());
 }
 
@@ -676,10 +734,10 @@ void ShowTierMenu(Player* player, Creature* creature, uint8 classId, uint8 race,
     for (uint8_t tier = 0; tier <= highestTier; ++tier)
     {
         std::ostringstream label;
-        label << HireTierKitName(tier) << " (" << HireFeeLabel(player, QuoteHireCostAtTier(player, tier)) << ")";
+        label << T(player, HireTierKitName(tier).c_str()) << " (" << HireFeeLabel(player, QuoteHireCostAtTier(player, tier)) << ")";
         AddItem(player, GOSSIP_ICON_BATTLE, label.str().c_str(), HireTierStepSender(tier), packed);
     }
-    AddItem(player, GOSSIP_ICON_TALK, "< Back", kHireTierBackSender, packed);
+    AddItem(player, GOSSIP_ICON_TALK, T(player, "< Back"), kHireTierBackSender, packed);
     player->PlayerTalkClass->SendGossipMenu(GossipText(player, creature), creature->GetObjectGuid());
 }
 
@@ -702,16 +760,21 @@ void ShowConfirmMenu(Player* player, Creature* creature, uint8 classId, uint8 ra
     }
     uint32_t cost = QuoteHireCostAtTier(player, gearTier);
     std::ostringstream label;
-    label << "Hire " << RaceName(race) << " " << ClassName(classId) << " (" << specs[specIndex].label << ")";
-    if (gearTier > 0)
-        label << " in " << HireTierKitName(gearTier);
-    label << " for " << HireFeeLabel(player, cost) << ". Confirm?";
+    std::map<std::string, std::string> ph;
+    ph["%race"] = RaceNameFor(player, race);
+    ph["%class"] = ClassNameFor(player, classId);
+    ph["%spec"] = T(player, specs[specIndex].label);
+    ph["%kit"] = gearTier > 0 ? T(player, HireTierKitName(gearTier).c_str()) : "";
+    ph["%fee"] = HireFeeLabel(player, cost);
+    label << sPlayerbotTextMgr.GetTextForLocale(gearTier > 0
+        ? "Hire %race %class (%spec) in %kit for %fee. Confirm?"
+        : "Hire %race %class (%spec) for %fee. Confirm?", LocIdx(player), ph);
     // The tier rides in the sender (530+tier); the packed selection rides in
     // the action. Back returns to the equipment step when the player has a
     // choice, else to the spec menu (unchanged old path).
     uint32 packed = (uint32(classId) << 24) | (uint32(race) << 16) | (uint32(gender) << 8) | specIndex;
     AddItem(player, GOSSIP_ICON_MONEY_BAG, label.str().c_str(), HireTierConfirmSender(gearTier), packed);
-    AddItem(player, GOSSIP_ICON_TALK, "< Back", kHireTierBackSender, packed);
+    AddItem(player, GOSSIP_ICON_TALK, T(player, "< Back"), kHireTierBackSender, packed);
     player->PlayerTalkClass->SendGossipMenu(GossipText(player, creature), creature->GetObjectGuid());
 }
 } // namespace
@@ -722,12 +785,12 @@ bool HireRecruiterScript::OnHello(Player* player, Creature* creature)
         return false;
     if (!sPlayerbotAIConfig.hireEnabled)
     {
-        CloseWithHint(player, "No mercenaries are mustering right now.");
+        CloseWithHint(player, T(player, "No mercenaries are mustering right now.").c_str());
         return true;
     }
     if (player->GetSession()->GetSecurity() < static_cast<int>(sPlayerbotAIConfig.hireMinAccountSecurity))
     {
-        CloseWithHint(player, "The recruiter sizes you up and shakes their head. (Your account may not hire.)");
+        CloseWithHint(player, T(player, "The recruiter sizes you up and shakes their head. (Your account may not hire.)").c_str());
         return true;
     }
     player->PlayerTalkClass->ClearMenus();
@@ -904,7 +967,7 @@ bool HireRecruiterScript::OnSelect(Player* player, Creature* creature, uint32_t 
         // before a level change cannot hire through the gate.
         if (!HireSpecOffered(classId, static_cast<int>(low), player ? player->GetLevel() : 0, sPlayerbotAIConfig.shamanTankEnabled))
         {
-            CloseWithHint(player, "Enhancement (Tank) is not available: it needs level 10 (Earthshaker Slam taunt), and the server may have it turned off.");
+            CloseWithHint(player, T(player, "Enhancement (Tank) is not available: it needs level 10 (Earthshaker Slam taunt), and the server may have it turned off.").c_str());
             return true;
         }
         // Issue #490 PR 2: equipment step between spec and confirm. One
@@ -959,7 +1022,7 @@ bool HireRecruiterScript::OnSelect(Player* player, Creature* creature, uint32_t 
             sel.gearTier = tierPick;
             sel.anyFaction = HireOfferTeam(player, creature) == TEAM_NONE;
             HireOutcome outcome = HireProvisionService::Instance().Hire(player, sel, true);
-            CloseWithHint(player, outcome.message.c_str());
+            CloseWithHint(player, LocalizeHireMessage(player, outcome).c_str());
             return true;
         }
         if (!visible)
@@ -1024,7 +1087,7 @@ bool HireRecruiterScript::OnSelect(Player* player, Creature* creature, uint32_t 
         sel.specIndex = static_cast<int>(specIndex);
         sel.anyFaction = HireOfferTeam(player, creature) == TEAM_NONE;
         HireOutcome outcome = HireProvisionService::Instance().Hire(player, sel, true);
-        CloseWithHint(player, outcome.message.c_str());
+        CloseWithHint(player, LocalizeHireMessage(player, outcome).c_str());
         return true;
     }
     ShowClassMenu(player, creature);

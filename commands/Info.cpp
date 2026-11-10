@@ -341,14 +341,14 @@ bool HandleLease(ChatHandler* handler, char const* args)
     }
     return true;
 }
-static std::string RosterLocation(uint32 mapId, uint32 zoneId, uint32 areaId)
+static std::string RosterLocation(ChatHandler* handler, uint32 mapId, uint32 zoneId, uint32 areaId)
 {
     uint32 displayAreaId = areaId ? areaId : zoneId;
     if (displayAreaId)
     {
         auto const* area = GetAreaEntryByAreaID(displayAreaId);
         if (area && area->Name && *area->Name)
-            return ProtocolSafe(area->Name);
+            return ProtocolSafe(LocalizedAreaName(handler, area->Id, area->Name));
     }
     if (!mapId && !zoneId && !areaId)
         return "-";
@@ -465,7 +465,7 @@ bool HandleRoster(ChatHandler* handler, char const* /*args*/)
         handler->PSendSysMessage("TBM:ROSTER|%u|%s|%u|%s|%u|%s|%s",
             row.characterGuid.GetCounter(), ProtocolSafe(name).c_str(), classId,
             ProtocolSafe(state).c_str(), grouped,
-            ProtocolSafe(RosterLocation(mapId, zoneId, areaId)).c_str(),
+            ProtocolSafe(RosterLocation(handler, mapId, zoneId, areaId)).c_str(),
             RosterClassName(classId, requester).c_str());
     }
     handler->PSendSysMessage("TBM:ROSTER_END");
@@ -567,7 +567,7 @@ bool HandleRoster(ChatHandler* handler, char const* /*args*/)
         handler->PSendSysMessage("TBM:CLAIMED|%u|%s|%u|%u|%s|%u|%s|%u|%s|%u|%s",
             botGuidLow, ProtocolSafe(name).c_str(), classId, level,
             ProtocolSafe(state).c_str(), grouped,
-            ProtocolSafe(RosterLocation(mapId, zoneId, areaId)).c_str(),
+            ProtocolSafe(RosterLocation(handler, mapId, zoneId, areaId)).c_str(),
             gearLocked, profs.c_str(), isAlt,
             RosterClassName(classId, requester).c_str());
     }

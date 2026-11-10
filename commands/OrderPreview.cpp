@@ -199,7 +199,7 @@ bool PreviewGuildHasMaker(Player* self, uint32_t guildId, uint32_t itemId)
     return false;
 }
 
-std::string PreviewZoneName(uint32_t zoneId)
+std::string PreviewZoneName(ChatHandler* handler, uint32_t zoneId)
 {
     if (!zoneId)
         return "-";
@@ -209,7 +209,7 @@ std::string PreviewZoneName(uint32_t zoneId)
     AreaTableEntry const* zone = entry->ZoneId ? GetAreaEntryByAreaID(entry->ZoneId) : entry;
     if (!zone || !zone->Name)
         return "-";
-    return zone->Name;
+    return BotCommands::LocalizedAreaName(handler, zone->Id, zone->Name);
 }
 
 } // namespace
@@ -477,7 +477,7 @@ bool HandleOrderPreview(ChatHandler* handler, Player* requester, std::string con
         if (farm.verdict == OrderReason::None && !farm.zones.empty())
         {
             row.farmCount = shortfall;
-            row.farmZone = BotCommands::ProtocolSafe(PreviewZoneName(farm.zones[0].zoneId));
+            row.farmZone = BotCommands::ProtocolSafe(PreviewZoneName(handler, farm.zones[0].zoneId));
             hasFarmLeg = true;
             if (farm.bestChance > 0.0f)
                 hardestKills = std::max(hardestKills,
@@ -509,7 +509,7 @@ bool HandleOrderPreview(ChatHandler* handler, Player* requester, std::string con
     }
     std::string zone = "-";
     if (!plan.zones.empty())
-        zone = BotCommands::ProtocolSafe(PreviewZoneName(plan.zones[0].zoneId));
+        zone = BotCommands::ProtocolSafe(PreviewZoneName(handler, plan.zones[0].zoneId));
     handler->PSendSysMessage("TBM:ORDER_PREVIEW|%s|%s|%u|%s|%u|%u|%s|%s|%s|%u|%s|%s",
         botNameSafe.c_str(), TypeToken(type), itemId, itemNameSafe.c_str(), amount,
         outputMissing, difficulty.c_str(), zone.c_str(), PreviewReagentsToken(rows).c_str(),

@@ -65,6 +65,12 @@ struct EnchantSnapshot
 };
 std::vector<EnchantSnapshot> OrderableEnchantSpells(Player* bot, std::vector<std::string> const& words);
 std::string ProtocolSafe(std::string value);
+// [shiken] area/zone name in the requester's DB locale (locales_area); falls
+// back to the given English name when the locale has no entry.
+std::string LocalizedAreaName(ChatHandler* handler, uint32_t areaId, std::string name);
+// [shiken] loot-log source (corpse/chest/node) English name -> DB locale name
+// (locales_creature / locales_gameobject); unchanged when no translation.
+std::string LocalizedLootSourceName(int locIdx, std::string const& sourceType, std::string const& name);
 void NoteCommanderOrderResult(ChatHandler* handler, std::string const& intent, bool ok, std::string const& result);
 void SendActionError(ChatHandler* handler, std::string const& intent, char const* code, char const* message);
 void SendActionAck(ChatHandler* handler, std::string const& intent, std::string const& scope, uint32_t count,

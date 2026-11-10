@@ -2966,6 +2966,14 @@ AiPlayerbot.BotProfessionSpecializations = 2
 #max limit of members in a guild (bots will leave guild if there are more members than this number)
 # AiPlayerbot.GuildMaxBotLimit = 1000
 
+# [shiken] Language of the bot lines from ai_playerbot_texts and of the quest /
+# object names in bot chat links. One language for everybody, because a channel
+# line is heard by many players at once.
+# -1 - automatic (default): English while real players are online
+#  0 - English, 1 koKR, 2 frFR, 3 deDE, 4 zhCN, 5 zhTW, 6 esES, 7 esMX, 8 ruRU
+# A line without text in the chosen language falls back to English.
+AiPlayerbot.BotTextLocale = -1
+
 # Minimum level at which bots will start accepting duels
 # AiPlayerbot.BotAcceptDuelMinimumLevel = 10
 

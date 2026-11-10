@@ -1358,6 +1358,8 @@ public:
 
     uint32 guildMaxBotLimit;
 
+    int32 botTextLocale; // [shiken] AiPlayerbot.BotTextLocale: -1 = upstream behaviour, else LocaleConstant
+
     uint32 botAcceptDuelMinimumLevel;
 
     bool talentsInPublicNote;

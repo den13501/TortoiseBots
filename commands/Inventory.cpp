@@ -810,7 +810,8 @@ bool HandleLootLog(ChatHandler* handler, char const* args)
         std::string info2 = ProtocolSafe(row.info2);
         std::string item = ProtocolSafe(row.info1);
         std::string sourceType = ProtocolSafe(row.info3);
-        std::string source = ProtocolSafe(row.info4);
+        std::string source = ProtocolSafe(LocalizedLootSourceName(
+            handler->GetSession() ? handler->GetSession()->GetSessionDbLocaleIndex() : -1, row.info3, row.info4));
         std::string quality = ProtocolSafe(row.info5);
         if (row.event == "LootRoll")
         {

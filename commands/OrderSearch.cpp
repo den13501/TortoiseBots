@@ -79,14 +79,14 @@ std::string ToLower(std::string value)
     return value;
 }
 
-std::string ZoneName(uint32_t zoneId)
+std::string ZoneName(ChatHandler* handler, uint32_t zoneId)
 {
     if (!zoneId)
         return "-";
     AreaTableEntry const* area = GetAreaEntryByAreaID(zoneId);
     if (!area || !area->Name)
         return "-";
-    return area->Name;
+    return LocalizedAreaName(handler, area->Id, area->Name);
 }
 
 // Items a primary or secondary profession recipe creates. Class skills
@@ -355,7 +355,7 @@ bool HandleOrderSearch(ChatHandler* handler, Player* requester, Player* bot, std
         if (!proto)
             continue;
         TortoiseBots::GuildOrders::SourcePlan const& plan = result.plan;
-        std::string const zone = plan.zones.empty() ? "-" : ZoneName(plan.zones.front().zoneId);
+        std::string const zone = plan.zones.empty() ? "-" : ZoneName(handler, plan.zones.front().zoneId);
         uint32_t const chance = plan.zones.empty() ? 0 : plan.zones.front().chance;
         std::string const skill = plan.skillId ? std::to_string(plan.skillId) + ":" + std::to_string(plan.skillValue) : "-";
         std::string const verdict = plan.verdict == OrderReason::None ? "ok" : ReasonToken(plan.verdict);
