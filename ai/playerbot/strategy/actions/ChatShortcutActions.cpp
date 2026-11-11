@@ -1,6 +1,7 @@
 
 #include "playerbot/playerbot.h"
 #include "ChatShortcutActions.h"
+#include "playerbot/PlayerbotTextMgr.h"
 #include "playerbot/PlayerbotAIConfig.h"
 #include "playerbot/strategy/values/PositionValue.h"
 #include "playerbot/strategy/values/Formations.h"
@@ -32,6 +33,14 @@ void ReturnPositionResetAction::PrintStrategies(PlayerbotAI* ai, Event& event)
         Player* requester = event.GetOwner() ? event.GetOwner() : ai->GetMaster();
         ai->PrintStrategies(requester, BotState::BOT_STATE_ALL);
     }
+}
+
+// [shiken] "is following X." through ai_playerbot_texts (BotTextLocale), English when no row.
+static std::string FollowEmoteText(std::string const& targetName)
+{
+    std::map<std::string, std::string> ph;
+    ph["%name"] = targetName;
+    return sPlayerbotTextMgr.GetBotTextOrDefault("is following %name.", "is following %name.", ph);
 }
 
 bool FollowChatShortcutAction::Execute(Event& event)
@@ -102,13 +111,13 @@ bool FollowChatShortcutAction::Execute(Event& event)
         if (MoveTo(loc.mapId, loc.x, loc.y, loc.z, false, false))
         {
             if (!ai->HasStrategy("silent", BotState::BOT_STATE_NON_COMBAT) && announce)
-                bot->TextEmote("is following " + targetName + ".");
+                bot->TextEmote(FollowEmoteText(targetName));
             return true;
         }
     }
 
     if (!ai->HasStrategy("silent", BotState::BOT_STATE_NON_COMBAT) && announce)
-        bot->TextEmote("is following " + targetName + ".");
+        bot->TextEmote(FollowEmoteText(targetName));
     return true;
 }
 
