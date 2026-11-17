@@ -35,7 +35,7 @@ void ReturnPositionResetAction::PrintStrategies(PlayerbotAI* ai, Event& event)
     }
 }
 
-// [shiken] "is following X." through ai_playerbot_texts (BotTextLocale), English when no row.
+// "is following X." through ai_playerbot_texts (BotTextLocale), English when no row.
 static std::string FollowEmoteText(std::string const& targetName)
 {
     std::map<std::string, std::string> ph;

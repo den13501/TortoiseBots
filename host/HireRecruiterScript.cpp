@@ -121,7 +121,7 @@ char const* RaceName(uint8 race)
     }
 }
 
-// [shiken] fixed menu text -> the player's language via ai_playerbot_texts (name = English text, text_loc<N>).
+// fixed menu text -> the player's language via ai_playerbot_texts (name = English text, text_loc<N>).
 int32 LocIdx(Player* player)
 {
     return player && player->GetSession() ? player->GetSession()->GetSessionDbLocaleIndex() : -1;
@@ -268,7 +268,7 @@ void ShowTierMenu(Player* player, Creature* creature, uint8 classId, uint8 race,
 void ShowConfirmMenu(Player* player, Creature* creature, uint8 classId, uint8 race, uint8 gender,
     uint8 specIndex, uint8 gearTier);
 
-// [shiken] HireProvisionService builds its answer in English; translate the fixed ones and the success line.
+// HireProvisionService builds its answer in English; translate the fixed ones and the success line.
 std::string LocalizeHireMessage(Player* player, HireOutcome const& outcome)
 {
     std::string const& m = outcome.message;

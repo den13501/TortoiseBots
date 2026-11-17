@@ -24,7 +24,7 @@
 #include "../../../../runtime/GuildOrderStore.h"
 
 namespace TortoiseBots { namespace BotCommands {
-std::string LocalizedLootSourceName(int locIdx, std::string const& sourceType, std::string const& name); // [shiken]
+std::string LocalizedLootSourceName(int locIdx, std::string const& sourceType, std::string const& name);
 } }
 
 

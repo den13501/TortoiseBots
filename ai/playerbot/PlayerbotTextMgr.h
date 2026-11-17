@@ -47,7 +47,7 @@ class PlayerbotTextMgr
             ReplacePlaceholders(fallback, placeholders);
             return fallback;
         }
-        // [shiken] fixed English UI text -> translation for one listener (session DB locale index, -1 = English).
+        // fixed English UI text -> translation for one listener (session DB locale index, -1 = English).
         // The English text itself is the ai_playerbot_texts name; no row or no translation returns the English.
         std::string GetTextForLocale(std::string const& english, int32 localeIdx) const;
         std::string GetTextForLocale(std::string const& english, int32 localeIdx,

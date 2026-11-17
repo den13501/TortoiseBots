@@ -1453,7 +1453,7 @@ bool PlayerbotAIConfig::Initialize()
 
     guildMaxBotLimit = config.GetIntDefault("AiPlayerbot.GuildMaxBotLimit", 1000);
 
-    // [shiken] fixed language for bot texts and the names in bot chat links
+    // fixed language for bot texts and the names in bot chat links
     botTextLocale = config.GetIntDefault("AiPlayerbot.BotTextLocale", -1);
     if (botTextLocale < -1 || botTextLocale >= MAX_LOCALE)
         botTextLocale = -1;

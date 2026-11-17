@@ -60,7 +60,7 @@ void PlayerbotTextMgr::LoadBotTexts()
     sLog.outBasic("%d playerbot texts loaded", count);
 }
 
-// [shiken] fixed English UI text -> translation for one listener (see PlayerbotTextMgr.h)
+// fixed English UI text -> translation for one listener (see PlayerbotTextMgr.h)
 std::string PlayerbotTextMgr::GetTextForLocale(std::string const& english, int32 localeIdx) const
 {
     if (localeIdx < 0)
@@ -124,7 +124,7 @@ void PlayerbotTextMgr::AddLocalePriority(int32 locale)
 
 int32 PlayerbotTextMgr::GetLocalePriority()
 {
-    // [shiken] AddLocalePriority() has no caller, so the vote below always ends in English while players are online.
+    // AddLocalePriority() has no caller, so the vote below always ends in English while players are online.
     // A configured locale returns its locale-table index directly (-1 = enUS / not loaded -> English).
     if (sPlayerbotAIConfig.botTextLocale >= 0)
         return sObjectMgr.GetIndexForLocale(LocaleConstant(sPlayerbotAIConfig.botTextLocale));
