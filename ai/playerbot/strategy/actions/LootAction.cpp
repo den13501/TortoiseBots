@@ -514,24 +514,31 @@ static void NotifyOwnerOfLoot(PlayerbotAI* ai, Player* bot, std::string item, ui
     std::string timestamp = sPlayerbotAIConfig.GetTimestampStr() + "+00";
     std::string botName = bot->GetName();
     std::string qualityText = std::to_string(quality);
-    if (owner->GetSession())
-        source = TortoiseBots::BotCommands::LocalizedLootSourceName(
-            owner->GetSession()->GetSessionDbLocaleIndex(), sourceType, source);
     std::string head = "TBM:LOOT|" + timestamp + "|" + botName + "|StoreLootAction|" + std::to_string(itemId) + "|";
     size_t fixedBytes = head.size() + 1 + sourceType.size() + 1 + 1 + qualityText.size();
-    ai::LootHistoryPolicy::FitLootWireLine(item, source, fixedBytes);
-    for (std::string* field : { &item, &source })
-        for (char& character : *field)
-            if (character == '|' || character == '\r' || character == '\n')
-                character = ' ';
 
-    std::string wireLine = head + item + "|" + sourceType + "|" + source + "|" + qualityText;
+    // The source name follows each receiver's client locale, so the line is built per locale.
+    std::map<int, std::string> wireByLocale;
     for (Group::MemberSlot const& slot : group->GetMemberSlots())
     {
         Player* member = ObjectAccessor::FindPlayer(slot.guid);
         if (!member || member == bot || !member->IsInWorld() || !ai->IsRealPlayer(member))
             continue;
-        member->SendAddonMessage("TBM", wireLine);
+        int locIdx = member->GetSession() ? member->GetSession()->GetSessionDbLocaleIndex() : -1;
+        auto found = wireByLocale.find(locIdx);
+        if (found == wireByLocale.end())
+        {
+            std::string lineItem = item;
+            std::string lineSource = TortoiseBots::BotCommands::LocalizedLootSourceName(locIdx, sourceType, source);
+            ai::LootHistoryPolicy::FitLootWireLine(lineItem, lineSource, fixedBytes);
+            for (std::string* field : { &lineItem, &lineSource })
+                for (char& character : *field)
+                    if (character == '|' || character == '\r' || character == '\n')
+                        character = ' ';
+            found = wireByLocale.emplace(locIdx,
+                head + lineItem + "|" + sourceType + "|" + lineSource + "|" + qualityText).first;
+        }
+        member->SendAddonMessage("TBM", found->second);
     }
 }
 
